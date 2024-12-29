@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+C:/Users/mhung/prjESP32/testAImodel/build/CMakeFiles/bootloader
+C:/Users/mhung/prjESP32/testAImodel/build/CMakeFiles/bootloader.rule
+C:/Users/mhung/prjESP32/testAImodel/build/CMakeFiles/bootloader-complete.rule
+C:/Users/mhung/prjESP32/testAImodel/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+C:/Users/mhung/prjESP32/testAImodel/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+C:/Users/mhung/prjESP32/testAImodel/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+C:/Users/mhung/prjESP32/testAImodel/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+C:/Users/mhung/prjESP32/testAImodel/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+C:/Users/mhung/prjESP32/testAImodel/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+C:/Users/mhung/prjESP32/testAImodel/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
