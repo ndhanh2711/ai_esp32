@@ -1,3 +1,4 @@
+//-----------------------Khai bao thu vien cua AI---------------------------------
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <esp_log.h>
@@ -6,7 +7,138 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h> // Thêm thư viện để sử dụng hàm exp
+//--------------------------------------------------------------------------------
 
+//----------------------Khai bao thu vien cua LCD---------------------------------
+#include <stdio.h>
+#include <unistd.h>      // for usleep
+#include "driver/i2c.h"  // for I2C communication
+#include "i2c-lcd.h"
+//--------------------------------------------------------------------------------
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/ledc.h"
+#include "esp_err.h"
+
+#define LEDC_TIMER              LEDC_TIMER_0
+#define LEDC_MODE               LEDC_LOW_SPEED_MODE
+#define LEDC_OUTPUT_IO          4  // GPIO4
+#define LEDC_CHANNEL            LEDC_CHANNEL_0
+#define LEDC_DUTY_RES           LEDC_TIMER_13_BIT // Độ phân giải 13 bit
+#define LEDC_FREQUENCY          5000 // Tần số 5 kHz
+
+//-----------------------------DEFINE lcd-----------------------------------------
+#define TAG "LCD"                  // Logging tag
+#define I2C_MASTER_NUM I2C_NUM_0   // Define I2C port
+#define SLAVE_ADDRESS_LCD 0x27     // I2C address of the LCD (modify if needed)
+
+// Send a command to the LCD
+static esp_err_t i2c_master_init(void)
+{
+    i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = GPIO_NUM_21,
+        .scl_io_num = GPIO_NUM_22,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = 100000,
+    };
+
+    i2c_param_config(I2C_NUM_0, &conf);
+
+    return i2c_driver_install(I2C_NUM_0, conf.mode, 0, 0, 0);
+} 
+void lcd_send_cmd(char cmd) {
+    esp_err_t err;
+    uint8_t data_u, data_l;    // Sửa từ `char` thành `uint8_t`
+    uint8_t data_t[4];         // Sửa từ `char` thành `uint8_t`
+
+    data_u = (cmd & 0xF0);
+    data_l = ((cmd << 4) & 0xF0);
+
+    data_t[0] = data_u | 0x0C;  // EN=1, RS=0
+    data_t[1] = data_u | 0x08;  // EN=0, RS=0
+    data_t[2] = data_l | 0x0C;  // EN=1, RS=0
+    data_t[3] = data_l | 0x08;  // EN=0, RS=0
+
+    err = i2c_master_write_to_device(I2C_MASTER_NUM, SLAVE_ADDRESS_LCD, data_t, 4, 1000);
+    if (err != ESP_OK) {
+        ESP_LOGI(TAG, "Error %d while sending command to LCD", err);
+    }
+}
+
+void lcd_send_data(char data) {
+    esp_err_t err;
+    uint8_t data_u, data_l;    // Sửa từ `char` thành `uint8_t`
+    uint8_t data_t[4];         // Sửa từ `char` thành `uint8_t`
+
+    data_u = (data & 0xF0);
+    data_l = ((data << 4) & 0xF0);
+
+    data_t[0] = data_u | 0x0D;  // EN=1, RS=1
+    data_t[1] = data_u | 0x09;  // EN=0, RS=1
+    data_t[2] = data_l | 0x0D;  // EN=1, RS=1
+    data_t[3] = data_l | 0x09;  // EN=0, RS=1
+
+    err = i2c_master_write_to_device(I2C_MASTER_NUM, SLAVE_ADDRESS_LCD, data_t, 4, 1000);
+    if (err != ESP_OK) {
+        ESP_LOGI(TAG, "Error %d while sending data to LCD", err);
+    }
+}
+
+
+// Initialize the LCD in 4-bit mode
+void lcd_init(void) {
+    usleep(50000);        // Wait for >40ms after power-up
+    lcd_send_cmd(0x30);
+    usleep(4500);         
+    lcd_send_cmd(0x30);
+    usleep(200);          
+    lcd_send_cmd(0x30);
+    usleep(200);          
+    lcd_send_cmd(0x20);   // 4-bit mode
+    usleep(200);
+
+    lcd_send_cmd(0x28);   // Function set: 4-bit mode, 2 lines, 5x8 font
+    usleep(1000);
+    lcd_send_cmd(0x08);   // Display off
+    usleep(1000);
+    lcd_send_cmd(0x01);   // Clear display
+    usleep(5000);         // Clear takes longer
+    lcd_send_cmd(0x06);   // Entry mode set: Increment cursor, no shift
+    usleep(1000);
+    lcd_send_cmd(0x0C);   // Display on, cursor off, blink off
+    usleep(2000);
+}
+
+// Clear the LCD screen
+void lcd_clear(void) {
+    lcd_send_cmd(0x01);  // Clear display command
+    usleep(5000);        // Allow time for the command to execute
+}
+
+// Set cursor position
+void lcd_put_cur(int row, int col) {
+    switch (row) {
+        case 0:
+            col |= 0x80;  // Row 0 starts at 0x80
+            break;
+        case 1:
+            col |= 0xC0;  // Row 1 starts at 0xC0
+            break;
+    }
+    lcd_send_cmd(col);
+}
+
+// Send a string to the LCD
+void lcd_send_string(char *str) {
+    while (*str) {
+        lcd_send_data(*str++);
+    }
+}
+
+//--------------------------------------------------------------------------------
 // Để nhúng file model_x.bst 
 // Con trỏ đến binary data ở trong app_main
 //
@@ -298,32 +430,52 @@ void app_main(void) {
     // Định nghĩa các con trỏ đến binary data của các model được nhúng
     extern const uint8_t model_1_bst_start[] asm("_binary_model_1_bst_start");
     extern const uint8_t model_1_bst_end[] asm("_binary_model_1_bst_end");
+
     extern const uint8_t model_2_bst_start[] asm("_binary_model_2_bst_start");
     extern const uint8_t model_2_bst_end[] asm("_binary_model_2_bst_end");
+
     extern const uint8_t model_3_bst_start[] asm("_binary_model_3_bst_start");
     extern const uint8_t model_3_bst_end[] asm("_binary_model_3_bst_end");
 
-    // Mảng chứa thông tin của các model
+    extern const uint8_t model_4_bst_start[] asm("_binary_model_4_bst_start");
+    extern const uint8_t model_4_bst_end[] asm("_binary_model_4_bst_end");
+
+    extern const uint8_t model_5_bst_start[] asm("_binary_model_5_bst_start");
+    extern const uint8_t model_5_bst_end[] asm("_binary_model_5_bst_end");
+
+    extern const uint8_t model_6_bst_start[] asm("_binary_model_6_bst_start");
+    extern const uint8_t model_6_bst_end[] asm("_binary_model_6_bst_end");
+
+    //extern const uint8_t model_7_bst_start[] asm("_binary_model_7_bst_start");
+   // extern const uint8_t model_7_bst_end[] asm("_binary_model_7_bst_end");
+    //Mảng chứa thông tin của các model
     const struct {
         const uint8_t* start;
         const uint8_t* end;
     } models[] = {
         {model_1_bst_start, model_1_bst_end},
         {model_2_bst_start, model_2_bst_end},
-        {model_3_bst_start, model_3_bst_end}
+        {model_3_bst_start, model_3_bst_end},
+        {model_4_bst_start, model_4_bst_end},
+        {model_5_bst_start, model_5_bst_end},
+        {model_6_bst_start, model_6_bst_end},
+        //{model_7_bst_start, model_7_bst_end}
     };
-
+    ESP_LOGI("Main", "Num Model %d:", 1);
     const unsigned int num_models = sizeof(models) / sizeof(models[0]);
+    ESP_LOGI("Main", "Num Model %u:", num_models);
     
     // Dữ liệu test
     const double* x_test[] = {
-        (double[]){45.9167, 89.3638, 37.8872, 319.1341},
+        //(double[]){45.9167, 89.3638, 37.8872, 319.1341},
+        //(double[]){66.33468616,65.69947446,22.40770301,627.9476169},
         (double[]){32.7403, 83.3032, 15.9857, 116.4093}
     };
+    
     unsigned int num_samples = sizeof(x_test) / sizeof(x_test[0]);
-
+    ESP_LOGI("Main", "Num Model %d:", num_samples);
     // Mảng lưu kết quả dự đoán
-    int predictions_arr[2][3] = {0}; // Hardcoded size vì ESP32 không hỗ trợ VLA
+    int predictions_arr[1][7] = {0}; // Hardcoded size vì ESP32 không hỗ trợ VLA
 
     // Lặp qua từng model để dự đoán
     for (unsigned int i = 0; i < num_models; ++i) {
@@ -348,34 +500,143 @@ void app_main(void) {
         }
     }
 
-    // In mảng kết quả dự đoán cuối cùng
-    ESP_LOGI("Main", "Final Predictions Array:");
-    for (unsigned int j = 0; j < num_samples; ++j) {
-        ESP_LOGI("Main", "Sample %u Predictions: [%d, %d, %d]",
-                 j, predictions_arr[j][0], predictions_arr[j][1], predictions_arr[j][2]);
-    }
+    // // In mảng kết quả dự đoán cuối cùng
+    // ESP_LOGI("Main", "Final Predictions Array:");
+    // for (unsigned int j = 0; j < num_samples; ++j) {
+    //     ESP_LOGI("Main", "Sample %u Predictions: [%d, %d, %d]",
+    //              j, predictions_arr[j][0], predictions_arr[j][1], predictions_arr[j][2]);
+    // }
 
     // Diễn giải kết quả cuối cùng
+
+    //-----------Return Pump Level-----------
+    int pump_level = 10;
     ESP_LOGI("Main", "Final Interpreted Results:");
     for (unsigned int j = 0; j < num_samples; ++j) {
         int interpreted_result = 0;
-        int combination = predictions_arr[j][0] * 100 + 
-                         predictions_arr[j][1] * 10 + 
-                         predictions_arr[j][2];
-
-        if (combination == 100) {
-            interpreted_result = 0;
-        } else if (combination == 10) {
+        int combination = predictions_arr[j][0] * 1000000 + 
+                         predictions_arr[j][1] * 100000 + 
+                         predictions_arr[j][2] * 10000 +
+                         predictions_arr[j][3] * 1000
+                         + predictions_arr[j][4] * 100
+                         + predictions_arr[j][5] * 10
+                         + predictions_arr[j][6] * 1;
+        if (combination == 1000000) {
             interpreted_result = 1;
-        } else if (combination == 1) {
+        }
+        else if (combination == 100000) {
             interpreted_result = 2;
-        } else {
+        }
+        else if (combination == 10000) {
+            interpreted_result = 3;
+        }
+        else if (combination == 1000) {
+            interpreted_result = 4;
+        }
+        else if (combination == 100) {
+            interpreted_result = 5;
+        }
+        else if (combination == 10) {
+            interpreted_result = 6;
+        }
+        else if (combination == 1) {
+            interpreted_result = 7;
+        }
+        else {
             interpreted_result = 0;
         }
-
+        pump_level = interpreted_result;
         ESP_LOGI("Main", "Sample %u Interpreted Result: %d", j, interpreted_result);
     }
 
     // Giải phóng bộ nhớ
     freeMyXGBClassifier(classifier);
+//-----------------------------Code Display on LCD------------------------------------
+ESP_ERROR_CHECK(i2c_master_init());
+    ESP_LOGI(TAG, "I2C initialized successfully");
+
+    lcd_init();
+    lcd_clear();
+
+    // Example 1: Display static text
+    lcd_put_cur(0, 0);
+    char buffer[32];  // Kích thước đủ lớn để chứa chuỗi kết quả
+    sprintf(buffer, "Pump Level: %d", pump_level);
+    
+    lcd_send_string(buffer);
+//-----------------------------------------------------------------------------------
+
+// 1. Cấu hình timer cho LEDC
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode       = LEDC_MODE,
+        .timer_num        = LEDC_TIMER,
+        .duty_resolution  = LEDC_DUTY_RES,
+        .freq_hz          = LEDC_FREQUENCY,
+        .clk_cfg          = LEDC_AUTO_CLK
+    };
+    ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+
+    // 2. Cấu hình LEDC channel
+    ledc_channel_config_t ledc_channel = {
+        .gpio_num       = LEDC_OUTPUT_IO,
+        .speed_mode     = LEDC_MODE,
+        .channel        = LEDC_CHANNEL,
+        .timer_sel      = LEDC_TIMER,
+        .duty           = 0, // Ban đầu duty cycle = 0
+        .hpoint         = 0
+    };
+    ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
+//---------------------------------DIEU KHIEN MAY BOM-------------------------------
+    // 3. Điều khiển PWM với các mức độ
+    while (1) {
+        // Mức 33%
+        if(pump_level == 0){
+        printf("Setting PWM to 33%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) * 33 / 100));
+        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        }
+
+        // Mức 66%
+        else if(pump_level == 1){
+        printf("Setting PWM to 66%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) * 66 / 100));
+        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        }
+        else if(pump_level == 2){
+        // Mức 100%
+        printf("Setting PWM to 100%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        }
+        else if(pump_level == 3){
+        // Mức 100%
+        printf("Setting PWM to 100%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        }
+        else if(pump_level == 4){
+        // Mức 100%
+        printf("Setting PWM to 100%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        }
+        else if(pump_level == 5){
+        // Mức 100%
+        printf("Setting PWM to 100%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        }
+        else if(pump_level == 6){
+        // Mức 100%
+        printf("Setting PWM to 100%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        }
+        else if(pump_level == 7){
+        // Mức 100%
+        printf("Setting PWM to 100%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        }
+    }
 }
