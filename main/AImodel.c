@@ -443,11 +443,11 @@ void app_main(void) {
     extern const uint8_t model_5_bst_start[] asm("_binary_model_5_bst_start");
     extern const uint8_t model_5_bst_end[] asm("_binary_model_5_bst_end");
 
-    extern const uint8_t model_6_bst_start[] asm("_binary_model_6_bst_start");
-    extern const uint8_t model_6_bst_end[] asm("_binary_model_6_bst_end");
+    // 
 
     //extern const uint8_t model_7_bst_start[] asm("_binary_model_7_bst_start");
-   // extern const uint8_t model_7_bst_end[] asm("_binary_model_7_bst_end");
+   // externextern const uint8_t model_6_bst_start[] asm("_binary_model_6_bst_start");
+    // extern const uint8_t model_6_bst_end[] asm("_binary_model_6_bst_end"); const uint8_t model_7_bst_end[] asm("_binary_model_7_bst_end");
     //Mảng chứa thông tin của các model
     const struct {
         const uint8_t* start;
@@ -458,7 +458,7 @@ void app_main(void) {
         {model_3_bst_start, model_3_bst_end},
         {model_4_bst_start, model_4_bst_end},
         {model_5_bst_start, model_5_bst_end},
-        {model_6_bst_start, model_6_bst_end},
+        //{model_6_bst_start, model_6_bst_end},
         //{model_7_bst_start, model_7_bst_end}
     };
     ESP_LOGI("Main", "Num Model %d:", 1);
@@ -466,16 +466,22 @@ void app_main(void) {
     ESP_LOGI("Main", "Num Model %u:", num_models);
     
     // Dữ liệu test
-    const double* x_test[] = {
-        //(double[]){45.9167, 89.3638, 37.8872, 319.1341},
-        //(double[]){66.33468616,65.69947446,22.40770301,627.9476169},
-        (double[]){32.7403, 83.3032, 15.9857, 116.4093}
+   
+    const double* x_test[] = {  
+       // (double[]){78.46, 87.51, 24.49, 151.35},  //1
+        // (double[]){77.94, 58.17, 18.31, 73.59},   // 2
+        // (double[]){69.09, 51.7, 21.24, 616.62} ,   // 3
+        // (double[]){31.78, 24.39, 11.0, 87.08}  ,    //4
+        // (double[]){40.47, 59.21, 12.13, 918.97}  ,  // 5
+         (double[]){50.96, 26.00, 26.81, 792.59}  , //0
+ 
     };
-    
+
+
     unsigned int num_samples = sizeof(x_test) / sizeof(x_test[0]);
     ESP_LOGI("Main", "Num Model %d:", num_samples);
     // Mảng lưu kết quả dự đoán
-    int predictions_arr[1][7] = {0}; // Hardcoded size vì ESP32 không hỗ trợ VLA
+    int predictions_arr[1][5] = {0}; // Hardcoded size vì ESP32 không hỗ trợ VLA
 
     // Lặp qua từng model để dự đoán
     for (unsigned int i = 0; i < num_models; ++i) {
@@ -514,33 +520,26 @@ void app_main(void) {
     ESP_LOGI("Main", "Final Interpreted Results:");
     for (unsigned int j = 0; j < num_samples; ++j) {
         int interpreted_result = 0;
-        int combination = predictions_arr[j][0] * 1000000 + 
-                         predictions_arr[j][1] * 100000 + 
-                         predictions_arr[j][2] * 10000 +
-                         predictions_arr[j][3] * 1000
-                         + predictions_arr[j][4] * 100
-                         + predictions_arr[j][5] * 10
-                         + predictions_arr[j][6] * 1;
-        if (combination == 1000000) {
+        int combination = predictions_arr[j][0] * 10000 + 
+                         predictions_arr[j][1] * 1000 + 
+                         predictions_arr[j][2] * 100 +
+                         predictions_arr[j][3] * 10
+                         + predictions_arr[j][4] * 1;
+                       
+        if (combination == 10000) {
             interpreted_result = 1;
         }
-        else if (combination == 100000) {
+        else if (combination == 1000) {
             interpreted_result = 2;
         }
-        else if (combination == 10000) {
+        else if (combination == 100) {
             interpreted_result = 3;
         }
-        else if (combination == 1000) {
+        else if (combination == 10) {
             interpreted_result = 4;
         }
-        else if (combination == 100) {
-            interpreted_result = 5;
-        }
-        else if (combination == 10) {
-            interpreted_result = 6;
-        }
         else if (combination == 1) {
-            interpreted_result = 7;
+            interpreted_result = 5;
         }
         else {
             interpreted_result = 0;
@@ -548,7 +547,7 @@ void app_main(void) {
         pump_level = interpreted_result;
         ESP_LOGI("Main", "Sample %u Interpreted Result: %d", j, interpreted_result);
     }
-
+    
     // Giải phóng bộ nhớ
     freeMyXGBClassifier(classifier);
 //-----------------------------Code Display on LCD------------------------------------
@@ -592,32 +591,32 @@ ESP_ERROR_CHECK(i2c_master_init());
         // Mức 33%
         if(pump_level == 0){
         printf("Setting PWM to 33%% duty cycle\n");
-        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) * 33 / 100));
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) * 0));
         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
         }
 
         // Mức 66%
         else if(pump_level == 1){
-        printf("Setting PWM to 66%% duty cycle\n");
-        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) * 66 / 100));
+        printf("Setting PWM to 20%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) * 20 / 100));
         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
         }
         else if(pump_level == 2){
         // Mức 100%
-        printf("Setting PWM to 100%% duty cycle\n");
-        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        printf("Setting PWM to 40%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) * 40 / 100));
         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
         }
         else if(pump_level == 3){
         // Mức 100%
-        printf("Setting PWM to 100%% duty cycle\n");
-        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        printf("Setting PWM to 60%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) * 60 / 100));
         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
         }
         else if(pump_level == 4){
         // Mức 100%
-        printf("Setting PWM to 100%% duty cycle\n");
-        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        printf("Setting PWM to 80%% duty cycle\n");
+        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) * 80 / 100));
         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
         }
         else if(pump_level == 5){
@@ -626,17 +625,17 @@ ESP_ERROR_CHECK(i2c_master_init());
         ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
         }
-        else if(pump_level == 6){
-        // Mức 100%
-        printf("Setting PWM to 100%% duty cycle\n");
-        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
-        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
-        }
-        else if(pump_level == 7){
-        // Mức 100%
-        printf("Setting PWM to 100%% duty cycle\n");
-        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
-        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
-        }
+        // else if(pump_level == 6){
+        // // Mức 100%
+        // printf("Setting PWM to 100%% duty cycle\n");
+        // ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        // ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        // }
+        // else if(pump_level == 7){
+        // // Mức 100%
+        // printf("Setting PWM to 100%% duty cycle\n");
+        // ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, (1 << LEDC_DUTY_RES) - 1));
+        // ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL));
+        // }
     }
 }

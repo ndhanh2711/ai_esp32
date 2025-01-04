@@ -5,5 +5,4 @@ idf_component_register(SRCS "AImodel.c"
                                 "models\\model_3.bst"
                                 "models\\model_4.bst"
                                 "models\\model_5.bst"
-                                "models\\model_6.bst"
-                                "models\\model_7.bst")
+                                )
