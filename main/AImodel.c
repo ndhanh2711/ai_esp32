@@ -464,7 +464,6 @@ void app_main(void) {
     ESP_LOGI("Main", "Num Model %d:", 1);
     const unsigned int num_models = sizeof(models) / sizeof(models[0]);
     ESP_LOGI("Main", "Num Model %u:", num_models);
-    
     // Dữ liệu test
    
     const double* x_test[] = {  
@@ -476,6 +475,7 @@ void app_main(void) {
          (double[]){50.96, 26.00, 26.81, 792.59}  , //0
  
     };
+  
 
 
     unsigned int num_samples = sizeof(x_test) / sizeof(x_test[0]);
@@ -492,6 +492,12 @@ void app_main(void) {
             ESP_LOGE("Main", "Failed to load model %u", i);
             continue;
         }
+        ESP_LOGI("Main", "Model %u loaded successfully", i + 1);
+
+         // Gọi hàm in cây sau khi tải model
+        TreeNode* root = (*classifier->models)->root;
+        ESP_LOGI("Main", "Printing decision tree for Model %u:", i + 1);
+        printTree(root, 0);
 
         double* predictions = classifierPredict(classifier, x_test, num_samples);
         if (predictions != NULL) {
